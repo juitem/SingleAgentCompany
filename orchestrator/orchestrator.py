@@ -183,11 +183,16 @@ def adapter_cline(step: dict, prompt: str, prompt_file: Path, output_dir: Path) 
     Cline CLI 파라미터:
       -y           : yolo 모드 (모든 작업 자동 승인)
       -c <dir>     : 작업 디렉토리 지정
-      <prompt>     : 실행할 프롬프트 (마지막 인자로 직접 전달)
+      <prompt>     : 실행할 프롬프트
+
+    프롬프트가 길 수 있으므로 파일로 저장 후 경로만 전달.
     """
     _print_step_header(step, "Cline CLI 실행 중...")
-    # 프롬프트를 파일로 저장하고 파일 내용을 읽어서 전달
-    cmd = ["cline", "-y", "-c", str(output_dir), prompt]
+    print(f"  프롬프트 파일: {prompt_file}")
+
+    # 프롬프트 파일 경로를 전달 — Cline이 파일을 읽고 실행
+    task = f"다음 파일을 읽고 지시사항을 그대로 수행하세요: {prompt_file}"
+    cmd = ["cline", "-y", "-c", str(output_dir), task]
     try:
         subprocess.run(cmd, check=True)
         done_file = output_dir / "DONE.md"
@@ -299,7 +304,7 @@ def generate_scripts(workflow: dict, company_dir: Path, context: dict):
 
         for tool, cmd_tpl in [
             ("claude", f'claude --print --dangerously-skip-permissions "$(cat \'{prompt_file}\')" > "{output_dir}/response.md"'),
-            ("cline",  f'cline -y -c "{output_dir}" "$(cat \'{prompt_file}\')"'),
+            ("cline",  f'cline -y -c "{output_dir}" "다음 파일을 읽고 지시사항을 그대로 수행하세요: {prompt_file}"'),
         ]:
             script = scripts_dir / f"{step['id']}_{tool}.sh"
             script.write_text(
