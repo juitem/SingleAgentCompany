@@ -4,15 +4,19 @@ SingleAgentCompany Orchestrator
 workflow.yaml을 읽고 단계별 프롬프트를 생성·관리하는 엔진.
 
 지원 모드:
-  manual  — 프롬프트 파일 생성 후 사용자가 직접 agent 도구에 붙여넣기
+  cline   — Cline CLI 자동 실행 (기본값 권장)
   claude  — claude CLI (Claude Code)로 자동 실행
+  manual  — 프롬프트 파일 저장 후 사용자가 직접 agent 도구에 붙여넣기
   print   — 프롬프트를 stdout으로 출력 (파이프 처리용)
 """
 
 import argparse
+import json
 import re
 import subprocess
 import sys
+import time
+from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -20,7 +24,10 @@ import yaml
 
 BASE_DIR = Path(__file__).parent.parent
 PROMPTS_DIR_NAME = "_prompts"
+STATE_FILE_NAME = "_state.json"
 
+
+# ── 파일 로딩 ────────────────────────────────────────────────
 
 def load_yaml(path: Path) -> dict:
     with open(path, "r", encoding="utf-8") as f:
@@ -28,7 +35,7 @@ def load_yaml(path: Path) -> dict:
 
 
 def load_text(path: Path) -> str:
-    """파일 또는 디렉토리 내용을 텍스트로 읽기. _prompt.md는 제외."""
+    """파일 또는 디렉토리 내용을 텍스트로 읽기. _로 시작하는 파일 제외."""
     if path.is_file():
         return path.read_text(encoding="utf-8")
     elif path.is_dir():
@@ -40,6 +47,48 @@ def load_text(path: Path) -> str:
         return "\n\n---\n\n".join(parts)
     return ""
 
+
+# ── 상태 관리 (재시작 지원) ──────────────────────────────────
+
+def load_state(company_dir: Path) -> dict:
+    state_file = company_dir / "output" / STATE_FILE_NAME
+    if state_file.exists():
+        try:
+            return json.loads(state_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {"completed_steps": [], "started_at": None}
+
+
+def save_state(company_dir: Path, state: dict):
+    output_dir = company_dir / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    state_file = output_dir / STATE_FILE_NAME
+    state_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def mark_step_done(company_dir: Path, step_id: str):
+    state = load_state(company_dir)
+    if "started_at" not in state or not state["started_at"]:
+        state["started_at"] = datetime.now().isoformat()
+    if step_id not in state["completed_steps"]:
+        state["completed_steps"].append(step_id)
+    state[f"{step_id}_done_at"] = datetime.now().isoformat()
+    save_state(company_dir, state)
+
+
+def is_step_done(company_dir: Path, step_id: str) -> bool:
+    """DONE.md 존재 또는 state.json 기록으로 완료 여부 확인."""
+    # 1. DONE.md 파일 존재 확인 (Cline이 직접 생성)
+    output_dir = company_dir / "output" / step_id
+    if (output_dir / "DONE.md").exists():
+        return True
+    # 2. state.json 기록 확인
+    state = load_state(company_dir)
+    return step_id in state.get("completed_steps", [])
+
+
+# ── 플레이스홀더 치환 ─────────────────────────────────────────
 
 def resolve_placeholder(value: str, context: dict) -> str:
     """{{user.key}}, {{output.step_id}} 플레이스홀더를 치환."""
@@ -71,7 +120,6 @@ def build_prompt(step: dict, context: dict, company_dir: Path) -> str:
 
     template = template_path.read_text(encoding="utf-8")
 
-    # {{persona}} 치환
     persona_name = step.get("persona", "")
     if persona_name:
         persona_path = BASE_DIR / "personas" / f"{persona_name}.md"
@@ -85,27 +133,34 @@ def build_prompt(step: dict, context: dict, company_dir: Path) -> str:
 
 # ── 실행 어댑터 ──────────────────────────────────────────────
 
+def _print_step_header(step: dict, extra: str = ""):
+    print(f"\n{'='*60}")
+    print(f"  [{step['id']}] {step['name']}{' — ' + extra if extra else ''}")
+    print(f"{'='*60}")
+
+
 def adapter_manual(step: dict, prompt: str, prompt_file: Path, output_dir: Path) -> bool:
     """프롬프트 파일 저장 후 사용자 확인 대기."""
-    print(f"\n{'='*60}")
-    print(f"  [{step['id']}] {step['name']}")
-    print(f"{'='*60}")
+    _print_step_header(step, "수동 실행 대기")
     print(f"  프롬프트: {prompt_file}")
     print(f"  출력 폴더: {output_dir}")
     print()
     print("  Cline, Cursor, Windsurf 등 원하는 도구에 프롬프트 파일을 붙여넣으세요.")
     print(f"  완료 후 결과물을 {output_dir}/ 에 저장하세요.")
     print()
-    print("  계속하려면 Enter, 중단하려면 q+Enter: ", end="", flush=True)
-    return input().strip().lower() != "q"
+    print("  계속: Enter  |  중단: q  |  건너뜀: s  >> ", end="", flush=True)
+    ans = input().strip().lower()
+    if ans == "q":
+        return False
+    if ans == "s":
+        print("  건너뜁니다.")
+        return True
+    return True
 
 
 def adapter_claude(step: dict, prompt: str, prompt_file: Path, output_dir: Path) -> bool:
     """claude CLI (Claude Code)로 자동 실행."""
-    print(f"\n{'='*60}")
-    print(f"  [{step['id']}] {step['name']} — claude CLI 실행 중...")
-    print(f"{'='*60}")
-
+    _print_step_header(step, "claude CLI 실행 중...")
     cmd = ["claude", "--print", "--dangerously-skip-permissions", prompt]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -115,7 +170,7 @@ def adapter_claude(step: dict, prompt: str, prompt_file: Path, output_dir: Path)
         print(f"  완료: {response_file}")
         return True
     except FileNotFoundError:
-        print("  오류: claude CLI를 찾을 수 없습니다. npm install -g @anthropic-ai/claude-code")
+        print("  오류: claude CLI 없음. npm install -g @anthropic-ai/claude-code")
         return False
     except subprocess.CalledProcessError as e:
         print(f"  오류: {e.stderr}")
@@ -123,25 +178,21 @@ def adapter_claude(step: dict, prompt: str, prompt_file: Path, output_dir: Path)
 
 
 def adapter_cline(step: dict, prompt: str, prompt_file: Path, output_dir: Path) -> bool:
-    """Cline CLI로 자동 실행.
-    Cline CLI: https://github.com/cline/cline
-    설치: npm install -g cline (또는 VS Code 익스텐션 설치 후 CLI 활성화)
-    """
-    print(f"\n{'='*60}")
-    print(f"  [{step['id']}] {step['name']} — Cline CLI 실행 중...")
-    print(f"{'='*60}")
-
-    # Cline CLI: cline --task "<prompt>" --output-dir "<dir>"
+    """Cline CLI로 자동 실행 + DONE.md 감지."""
+    _print_step_header(step, "Cline CLI 실행 중...")
     cmd = ["cline", "--task", prompt, "--output-dir", str(output_dir)]
     try:
-        result = subprocess.run(cmd, check=True)
-        print(f"  완료: {output_dir}")
+        subprocess.run(cmd, check=True)
+        # DONE.md 감지 (Cline이 완료 표시를 남겼는지 확인)
+        done_file = output_dir / "DONE.md"
+        if done_file.exists():
+            print(f"  ✓ DONE.md 확인: {done_file}")
+        else:
+            print(f"  ⚠ DONE.md 없음. 결과물을 확인하세요: {output_dir}")
         return True
     except FileNotFoundError:
-        print("  오류: Cline CLI를 찾을 수 없습니다.")
-        print("  설치: npm install -g cline")
-        print(f"  수동 실행: 아래 프롬프트 파일을 Cline에 붙여넣으세요.")
-        print(f"  {prompt_file}")
+        print("  오류: Cline CLI 없음. npm install -g cline")
+        print(f"  수동 실행: {prompt_file}")
         return False
     except subprocess.CalledProcessError as e:
         print(f"  오류: {e}")
@@ -165,7 +216,7 @@ ADAPTERS = {
 # ── 핵심 로직 ────────────────────────────────────────────────
 
 def prepare_step(step: dict, context: dict, company_dir: Path) -> tuple[str, Path, Path]:
-    """단계 준비: 프롬프트 빌드 + 파일 저장. (prompt, prompt_file, output_dir) 반환."""
+    """프롬프트 빌드 + 파일 저장. (prompt, prompt_file, output_dir) 반환."""
     output_dir = company_dir / step["outputs"][0]["path"]
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -180,72 +231,96 @@ def prepare_step(step: dict, context: dict, company_dir: Path) -> tuple[str, Pat
 
 
 def run_workflow(workflow: dict, company_dir: Path, context: dict,
-                 mode: str, target_step: str | None = None):
+                 mode: str, from_step: str | None = None,
+                 target_step: str | None = None, skip_done: bool = True):
+
     steps = workflow["steps"]
+
+    # 특정 단계만 실행
     if target_step:
         steps = [s for s in steps if s["id"] == target_step]
         if not steps:
             print(f"오류: step '{target_step}' 없음")
             sys.exit(1)
+    # from_step: 특정 단계부터 재시작
+    elif from_step:
+        ids = [s["id"] for s in steps]
+        if from_step not in ids:
+            print(f"오류: step '{from_step}' 없음")
+            sys.exit(1)
+        idx = ids.index(from_step)
+        steps = steps[idx:]
 
     adapter = ADAPTERS[mode]
 
-    # 모든 step의 output 경로를 미리 context에 등록 (의존성 참조용)
+    # 모든 step output 경로를 context에 등록
     for step in workflow["steps"]:
-        step_id = step["id"]
-        output_path = company_dir / step["outputs"][0]["path"]
-        context["outputs"][step_id] = str(output_path)
+        context["outputs"][step["id"]] = str(company_dir / step["outputs"][0]["path"])
 
-    for step in steps:
+    total = len(steps)
+    for i, step in enumerate(steps, 1):
+        step_id = step["id"]
+
+        # 이미 완료된 단계 건너뜀
+        if skip_done and is_step_done(company_dir, step_id):
+            print(f"  [{i}/{total}] {step_id} — 이미 완료 (건너뜀)")
+            continue
+
+        print(f"\n  진행: {i}/{total}")
         prompt, prompt_file, output_dir = prepare_step(step, context, company_dir)
         success = adapter(step, prompt, prompt_file, output_dir)
-        if not success:
-            print(f"\n중단: {step['id']}")
+
+        if success:
+            mark_step_done(company_dir, step_id)
+        else:
+            print(f"\n중단: {step_id}")
+            print(f"재시작: python orchestrator.py --company {company_dir.name} --from-step {step_id}")
             sys.exit(0)
 
-    print(f"\n완료. 결과물: {company_dir / 'output/'}")
+    print(f"\n모든 단계 완료. 결과물: {company_dir / 'output/'}")
 
 
 def generate_scripts(workflow: dict, company_dir: Path, context: dict):
-    """단계별 실행용 shell 스크립트 생성."""
+    """단계별 실행 스크립트 생성."""
     scripts_dir = company_dir / "output" / "_scripts"
     scripts_dir.mkdir(parents=True, exist_ok=True)
 
-    # 모든 output 경로 등록
     for step in workflow["steps"]:
         context["outputs"][step["id"]] = str(company_dir / step["outputs"][0]["path"])
 
     for step in workflow["steps"]:
         prompt, prompt_file, output_dir = prepare_step(step, context, company_dir)
 
-        # claude CLI 스크립트
-        claude_script = scripts_dir / f"{step['id']}_claude.sh"
-        claude_script.write_text(
-            f'#!/bin/bash\n# {step["name"]} — claude CLI\n'
-            f'mkdir -p "{output_dir}"\n'
-            f'claude --print --dangerously-skip-permissions "$(cat \'{prompt_file}\')" '
-            f'> "{output_dir}/response.md"\n'
-            f'echo "완료: {step["id"]}"\n',
-            encoding="utf-8"
-        )
-        claude_script.chmod(0o755)
+        for tool, cmd_tpl in [
+            ("claude", f'claude --print --dangerously-skip-permissions "$(cat \'{prompt_file}\')" > "{output_dir}/response.md"'),
+            ("cline",  f'cline --task "$(cat \'{prompt_file}\')" --output-dir "{output_dir}"'),
+        ]:
+            script = scripts_dir / f"{step['id']}_{tool}.sh"
+            script.write_text(
+                f'#!/bin/bash\n# [{step["id"]}] {step["name"]} — {tool}\n'
+                f'set -e\nmkdir -p "{output_dir}"\n{cmd_tpl}\n'
+                f'echo "완료: {step["id"]}"\n',
+                encoding="utf-8"
+            )
+            script.chmod(0o755)
+            print(f"  생성: {script.name}")
 
-        # cline CLI 스크립트
-        cline_script = scripts_dir / f"{step['id']}_cline.sh"
-        cline_script.write_text(
-            f'#!/bin/bash\n# {step["name"]} — Cline CLI\n'
-            f'mkdir -p "{output_dir}"\n'
-            f'cline --task "$(cat \'{prompt_file}\')" --output-dir "{output_dir}"\n'
-            f'echo "완료: {step["id"]}"\n',
-            encoding="utf-8"
-        )
-        cline_script.chmod(0o755)
-
-        print(f"생성: {claude_script}")
-        print(f"생성: {cline_script}")
-        print(f"프롬프트: {prompt_file}")
+        print(f"  프롬프트: {prompt_file.name}")
 
     print(f"\n스크립트 위치: {scripts_dir}/")
+
+
+def show_status(workflow: dict, company_dir: Path):
+    """각 단계의 완료 상태를 출력."""
+    print(f"\n{workflow['name']} — 상태")
+    print("-" * 50)
+    state = load_state(company_dir)
+    for step in workflow["steps"]:
+        done = is_step_done(company_dir, step["id"])
+        done_at = state.get(f"{step['id']}_done_at", "")
+        status = f"✓ 완료 ({done_at[:16]})" if done else "○ 미완료"
+        print(f"  {step['id']:<25} {status}")
+    print()
 
 
 def collect_user_inputs(workflow: dict, cli_inputs: list[str] | None) -> dict:
@@ -258,15 +333,19 @@ def collect_user_inputs(workflow: dict, cli_inputs: list[str] | None) -> dict:
                 user_inputs[k] = v
         return user_inputs
 
-    for inp in workflow.get("inputs", []):
+    inputs = workflow.get("inputs", [])
+    if not inputs:
+        return user_inputs
+
+    print("사용자 입력")
+    print("-" * 40)
+    for inp in inputs:
         name = inp["name"]
         desc = inp.get("description", name)
         default = inp.get("default", "")
         required = inp.get("required", True)
 
-        hint = ""
-        if default:
-            hint += f" (기본값: {default})"
+        hint = f" (기본값: {default})" if default else ""
         if not required:
             hint += " (선택사항)"
 
@@ -281,6 +360,8 @@ def collect_user_inputs(workflow: dict, cli_inputs: list[str] | None) -> dict:
     return user_inputs
 
 
+# ── 진입점 ───────────────────────────────────────────────────
+
 def main():
     parser = argparse.ArgumentParser(
         description="SingleAgentCompany Orchestrator",
@@ -289,24 +370,27 @@ def main():
 예제:
   python orchestrator.py --company web-agency
   python orchestrator.py --company web-agency --mode cline
-  python orchestrator.py --company web-agency --mode manual
   python orchestrator.py --company web-agency --step 03_frontend
+  python orchestrator.py --company web-agency --from-step 02_design
+  python orchestrator.py --company web-agency --status
   python orchestrator.py --company web-agency --generate-scripts
   python orchestrator.py --company web-agency --inputs "user_brief=포트폴리오 사이트"
 
 모드:
   cline   — Cline CLI 자동 실행 (기본값 권장)
   claude  — Claude Code CLI 자동 실행
-  manual  — 프롬프트 파일 저장 후 사용자가 직접 실행
+  manual  — 프롬프트 파일 생성 후 사용자가 직접 실행
   print   — 프롬프트를 stdout으로 출력
         """
     )
     parser.add_argument("--company", required=True, help="companies/ 하위 폴더명")
-    parser.add_argument("--mode", choices=list(ADAPTERS), default=None,
-                        help="실행 모드 (manual|claude|print, 기본값: workflow.yaml의 default_mode)")
+    parser.add_argument("--mode", choices=list(ADAPTERS), default=None)
     parser.add_argument("--step", help="특정 단계만 실행")
+    parser.add_argument("--from-step", help="이 단계부터 재시작")
+    parser.add_argument("--no-skip", action="store_true", help="완료된 단계도 다시 실행")
+    parser.add_argument("--status", action="store_true", help="각 단계 완료 상태 확인")
     parser.add_argument("--generate-scripts", action="store_true", help="shell 스크립트 일괄 생성")
-    parser.add_argument("--inputs", nargs="*", metavar="KEY=VALUE", help="입력값 직접 지정")
+    parser.add_argument("--inputs", nargs="*", metavar="KEY=VALUE")
     args = parser.parse_args()
 
     company_dir = BASE_DIR / "companies" / args.company
@@ -319,11 +403,16 @@ def main():
     mode = args.mode or workflow.get("default_mode", "manual")
 
     if mode not in ADAPTERS:
-        print(f"오류: 알 수 없는 모드 '{mode}'. 사용 가능: {list(ADAPTERS)}")
+        print(f"오류: 알 수 없는 모드 '{mode}'")
         sys.exit(1)
 
+    # 상태 확인 모드
+    if args.status:
+        show_status(workflow, company_dir)
+        return
+
     print(f"\n{workflow['name']} — {mode.upper()} 모드")
-    print(f"{workflow.get('description', '')}\n")
+    print(workflow.get("description", ""))
 
     user_inputs = collect_user_inputs(workflow, args.inputs)
     context = {"user": user_inputs, "outputs": {}}
@@ -331,7 +420,12 @@ def main():
     if args.generate_scripts:
         generate_scripts(workflow, company_dir, context)
     else:
-        run_workflow(workflow, company_dir, context, mode, args.step)
+        run_workflow(
+            workflow, company_dir, context, mode,
+            from_step=args.from_step,
+            target_step=args.step,
+            skip_done=not args.no_skip,
+        )
 
 
 if __name__ == "__main__":

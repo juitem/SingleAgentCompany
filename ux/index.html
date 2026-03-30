@@ -58,18 +58,43 @@
         </div>
 
         <div class="editor-layout">
-          <!-- 단계 목록 -->
+          <!-- 왼쪽: 워크플로우 메타 + 단계 목록 -->
           <div class="steps-panel">
-            <div class="panel-header">
-              <span>단계</span>
-              <button class="btn-icon" id="btn-add-step">+</button>
+            <!-- 워크플로우 기본 정보 -->
+            <div class="meta-section">
+              <div class="panel-header"><span>기본 정보</span></div>
+              <div class="meta-form">
+                <input id="wf-icon" placeholder="아이콘 (이모지)" maxlength="4" style="width:56px;text-align:center;font-size:18px" />
+                <input id="wf-name" placeholder="워크플로우 이름" style="flex:1" />
+                <input id="wf-description" placeholder="설명" style="width:100%" />
+                <select id="wf-mode" style="width:100%">
+                  <option value="cline">cline</option>
+                  <option value="claude">claude</option>
+                  <option value="manual">manual</option>
+                </select>
+              </div>
             </div>
-            <div class="steps-list" id="steps-list">
-              <!-- JS로 채워짐 -->
+
+            <!-- 입력값 -->
+            <div class="meta-section">
+              <div class="panel-header">
+                <span>입력값</span>
+                <button class="btn-icon" id="btn-add-input">+</button>
+              </div>
+              <div id="wf-inputs-list"></div>
+            </div>
+
+            <!-- 단계 -->
+            <div class="meta-section" style="flex:1;min-height:0;display:flex;flex-direction:column">
+              <div class="panel-header">
+                <span>단계</span>
+                <button class="btn-icon" id="btn-add-step">+</button>
+              </div>
+              <div class="steps-list" id="steps-list"></div>
             </div>
           </div>
 
-          <!-- 단계 상세 편집 -->
+          <!-- 오른쪽: 단계 상세 편집 -->
           <div class="step-detail" id="step-detail">
             <div class="empty-state">
               <p>왼쪽에서 단계를 선택하세요.</p>

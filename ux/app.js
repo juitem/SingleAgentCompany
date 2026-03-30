@@ -1,16 +1,13 @@
 /**
  * SingleAgentCompany UX
  * 순수 Vanilla JS — 별도 서버 불필요 (file:// 로 열기 가능)
- *
  * 데이터는 localStorage에 저장.
- * 초기 시드 데이터는 SEED_DATA에 정의.
  */
 
 // ── 시드 데이터 ──────────────────────────────────────────────
 const SEED_COMPANIES = [
   {
-    id: "web-agency",
-    icon: "🌐",
+    id: "web-agency", icon: "🌐",
     name: "Web Agency",
     description: "사용자 브리핑을 받아 웹페이지를 완성하는 워크플로우",
     default_mode: "cline",
@@ -18,15 +15,14 @@ const SEED_COMPANIES = [
       { name: "user_brief", description: "만들고 싶은 웹페이지에 대한 설명", required: true }
     ],
     steps: [
-      { id: "01_discovery", name: "요구사항 분석", persona: "pm", prompt_template: "prompts/01_discovery.md" },
-      { id: "02_design", name: "화면 설계", persona: "ux_designer", prompt_template: "prompts/02_design.md" },
-      { id: "03_frontend", name: "프론트엔드 구현", persona: "frontend_dev", prompt_template: "prompts/03_frontend.md" },
-      { id: "04_qa", name: "QA 검수", persona: "qa_engineer", prompt_template: "prompts/04_qa.md" },
+      { id: "01_discovery", name: "요구사항 분석", persona: "pm", prompt_template: "prompts/01_discovery.md", outputs: [{ path: "output/01_discovery/" }] },
+      { id: "02_design", name: "화면 설계", persona: "ux_designer", prompt_template: "prompts/02_design.md", outputs: [{ path: "output/02_design/" }] },
+      { id: "03_frontend", name: "프론트엔드 구현", persona: "frontend_dev", prompt_template: "prompts/03_frontend.md", outputs: [{ path: "output/03_frontend/" }] },
+      { id: "04_qa", name: "QA 검수", persona: "qa_engineer", prompt_template: "prompts/04_qa.md", outputs: [{ path: "output/04_qa/" }] },
     ]
   },
   {
-    id: "tizen-refactor",
-    icon: "🔧",
+    id: "tizen-refactor", icon: "🔧",
     name: "Tizen AI Refactor Co.",
     description: "Tizen 패키지를 AI agent 친화적으로 리팩토링하고 문서화",
     default_mode: "cline",
@@ -35,27 +31,26 @@ const SEED_COMPANIES = [
       { name: "refactor_goals", description: "리팩토링 목표 (선택사항)", required: false }
     ],
     steps: [
-      { id: "01_analysis", name: "코드 분석", persona: "code_analyst", prompt_template: "prompts/01_analysis.md" },
-      { id: "02_plan", name: "리팩토링 계획", persona: "architect", prompt_template: "prompts/02_plan.md" },
-      { id: "03_refactor", name: "리팩토링 실행", persona: "tizen_dev", prompt_template: "prompts/03_refactor.md" },
-      { id: "04_docs", name: "문서화", persona: "tech_writer", prompt_template: "prompts/04_docs.md" },
+      { id: "01_analysis", name: "코드 분석", persona: "code_analyst", prompt_template: "prompts/01_analysis.md", outputs: [{ path: "output/01_analysis/" }] },
+      { id: "02_plan", name: "리팩토링 계획", persona: "architect", prompt_template: "prompts/02_plan.md", outputs: [{ path: "output/02_plan/" }] },
+      { id: "03_refactor", name: "리팩토링 실행", persona: "tizen_dev", prompt_template: "prompts/03_refactor.md", outputs: [{ path: "output/03_refactor/" }] },
+      { id: "04_docs", name: "문서화", persona: "tech_writer", prompt_template: "prompts/04_docs.md", outputs: [{ path: "output/04_docs/" }] },
     ]
   },
   {
-    id: "skill-converter",
-    icon: "🔄",
+    id: "skill-converter", icon: "🔄",
     name: "Skill Converter Co.",
     description: "Multi-agent skill.md를 single-agent용으로 변환",
     default_mode: "cline",
     inputs: [
       { name: "skill_path", description: "변환할 multi-agent skill.md 경로", required: true },
-      { name: "target_tool", description: "변환 대상 도구 (기본값: cline)", required: false, default: "cline" }
+      { name: "target_tool", description: "변환 대상 도구", required: false, default: "cline" }
     ],
     steps: [
-      { id: "01_parse", name: "스킬 구조 분석", persona: "skill_analyst", prompt_template: "prompts/01_parse.md" },
-      { id: "02_mapping", name: "변환 전략 수립", persona: "workflow_architect", prompt_template: "prompts/02_mapping.md" },
-      { id: "03_rewrite", name: "스킬 재작성", persona: "skill_writer", prompt_template: "prompts/03_rewrite.md" },
-      { id: "04_review", name: "검수", persona: "skill_reviewer", prompt_template: "prompts/04_review.md" },
+      { id: "01_parse", name: "스킬 구조 분석", persona: "skill_analyst", prompt_template: "prompts/01_parse.md", outputs: [{ path: "output/01_parse/" }] },
+      { id: "02_mapping", name: "변환 전략 수립", persona: "workflow_architect", prompt_template: "prompts/02_mapping.md", outputs: [{ path: "output/02_mapping/" }] },
+      { id: "03_rewrite", name: "스킬 재작성", persona: "skill_writer", prompt_template: "prompts/03_rewrite.md", outputs: [{ path: "output/03_rewrite/" }] },
+      { id: "04_review", name: "검수", persona: "skill_reviewer", prompt_template: "prompts/04_review.md", outputs: [{ path: "output/04_review/" }] },
     ]
   }
 ];
@@ -79,35 +74,27 @@ const SEED_PERSONAS = [
 const Store = {
   key: "sac_data",
   load() {
-    try {
-      const raw = localStorage.getItem(this.key);
-      if (raw) return JSON.parse(raw);
-    } catch {}
+    try { const r = localStorage.getItem(this.key); if (r) return JSON.parse(r); } catch {}
     return null;
   },
-  save(data) {
-    localStorage.setItem(this.key, JSON.stringify(data));
-  },
+  save(data) { localStorage.setItem(this.key, JSON.stringify(data)); },
   init() {
     let data = this.load();
-    if (!data) {
-      data = { companies: SEED_COMPANIES, personas: SEED_PERSONAS };
-      this.save(data);
-    }
+    if (!data) { data = { companies: SEED_COMPANIES, personas: SEED_PERSONAS }; this.save(data); }
     return data;
   }
 };
 
-// ── 앱 상태 ──────────────────────────────────────────────────
-let state = {
-  data: null,
-  currentCompany: null,   // 편집 중인 company
-  currentStep: null,      // 편집 중인 step index
-};
+// ── 상태 ─────────────────────────────────────────────────────
+let state = { data: null, currentCompany: null, currentStep: null };
 
 // ── DOM 헬퍼 ─────────────────────────────────────────────────
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+
+function esc(str) {
+  return String(str ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
 
 function showView(id) {
   $$(".view").forEach(v => v.classList.remove("active"));
@@ -115,7 +102,16 @@ function showView(id) {
   $$(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.view === id));
 }
 
-// ── 워크플로우 목록 렌더 ─────────────────────────────────────
+function download(filename, content, type = "text/plain") {
+  const a = Object.assign(document.createElement("a"), {
+    href: URL.createObjectURL(new Blob([content], { type })),
+    download: filename
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── 워크플로우 목록 ──────────────────────────────────────────
 function renderCompanies() {
   const grid = $("#companies-grid");
   grid.innerHTML = "";
@@ -123,14 +119,12 @@ function renderCompanies() {
     const card = document.createElement("div");
     card.className = "company-card";
     card.innerHTML = `
-      <div class="company-card-icon">${c.icon || "⚡"}</div>
-      <h3>${c.name}</h3>
-      <p>${c.description || ""}</p>
+      <div class="company-card-icon">${esc(c.icon || "⚡")}</div>
+      <h3>${esc(c.name)}</h3>
+      <p>${esc(c.description || "")}</p>
       <div class="company-card-meta">
         <span class="badge">${c.steps.length}단계</span>
-        <span class="badge badge-${c.default_mode === "cline" ? "cline" : "manual"}">
-          ${c.default_mode || "manual"}
-        </span>
+        <span class="badge badge-${c.default_mode === "cline" ? "cline" : "manual"}">${esc(c.default_mode || "manual")}</span>
       </div>
     `;
     card.addEventListener("click", () => openEditor(c.id));
@@ -140,14 +134,60 @@ function renderCompanies() {
 
 // ── 편집기 ───────────────────────────────────────────────────
 function openEditor(companyId) {
-  state.currentCompany = JSON.parse(JSON.stringify(
-    state.data.companies.find(c => c.id === companyId)
-  ));
+  state.currentCompany = JSON.parse(JSON.stringify(state.data.companies.find(c => c.id === companyId)));
   state.currentStep = null;
-  $("#editor-title").textContent = state.currentCompany.name;
+  renderEditorHeader();
   renderStepList();
-  $("#step-detail").innerHTML = `<div class="empty-state"><p>왼쪽에서 단계를 선택하세요.</p></div>`;
+  showStepDetail(null);
   showView("editor");
+}
+
+function renderEditorHeader() {
+  const c = state.currentCompany;
+  $("#editor-title").textContent = c.name;
+  // 워크플로우 메타 폼
+  $("#wf-name").value = c.name;
+  $("#wf-description").value = c.description || "";
+  $("#wf-icon").value = c.icon || "⚡";
+  $("#wf-mode").value = c.default_mode || "cline";
+  renderInputsList();
+}
+
+function renderInputsList() {
+  const container = $("#wf-inputs-list");
+  container.innerHTML = "";
+  (state.currentCompany.inputs || []).forEach((inp, i) => {
+    const row = document.createElement("div");
+    row.className = "input-row";
+    row.innerHTML = `
+      <input class="inp-name" value="${esc(inp.name)}" placeholder="name" />
+      <input class="inp-desc" value="${esc(inp.description || "")}" placeholder="설명" style="flex:2" />
+      <label class="checkbox-label" style="flex-shrink:0">
+        <input type="checkbox" class="inp-required" ${inp.required !== false ? "checked" : ""} /> 필수
+      </label>
+      <input class="inp-default" value="${esc(inp.default || "")}" placeholder="기본값" style="width:100px" />
+      <button class="btn-icon btn-danger" data-idx="${i}">✕</button>
+    `;
+    row.querySelector(".btn-danger").addEventListener("click", () => removeInput(i));
+    ["inp-name","inp-desc","inp-required","inp-default"].forEach(cls => {
+      row.querySelector(`.${cls}`).addEventListener("input", () => syncInputFromRow(i, row));
+      row.querySelector(`.${cls}`).addEventListener("change", () => syncInputFromRow(i, row));
+    });
+    container.appendChild(row);
+  });
+}
+
+function syncInputFromRow(i, row) {
+  const inputs = state.currentCompany.inputs;
+  inputs[i].name = row.querySelector(".inp-name").value;
+  inputs[i].description = row.querySelector(".inp-desc").value;
+  inputs[i].required = row.querySelector(".inp-required").checked;
+  inputs[i].default = row.querySelector(".inp-default").value;
+}
+
+function removeInput(i) {
+  state.currentCompany.inputs.splice(i, 1);
+  renderInputsList();
 }
 
 function renderStepList() {
@@ -160,33 +200,57 @@ function renderStepList() {
     item.innerHTML = `
       <div class="step-num">${i + 1}</div>
       <div class="step-info">
-        <div class="step-name">${step.name}</div>
-        <div class="step-persona">${step.persona || "—"}</div>
+        <div class="step-name">${esc(step.name)}</div>
+        <div class="step-persona">${esc(step.persona || "—")}</div>
+      </div>
+      <div class="step-order-btns">
+        <button class="btn-order" data-dir="-1" data-idx="${i}" title="위로">↑</button>
+        <button class="btn-order" data-dir="1" data-idx="${i}" title="아래로">↓</button>
       </div>
     `;
-    item.addEventListener("click", () => selectStep(i));
+    item.querySelector(".step-info").addEventListener("click", () => selectStep(i));
+    item.querySelectorAll(".btn-order").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        moveStep(parseInt(btn.dataset.idx), parseInt(btn.dataset.dir));
+      });
+    });
     list.appendChild(item);
   });
+}
+
+function moveStep(idx, dir) {
+  const steps = state.currentCompany.steps;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= steps.length) return;
+  [steps[idx], steps[newIdx]] = [steps[newIdx], steps[idx]];
+  if (state.currentStep === idx) state.currentStep = newIdx;
+  else if (state.currentStep === newIdx) state.currentStep = idx;
+  renderStepList();
 }
 
 function selectStep(index) {
   state.currentStep = index;
   $$(".step-item").forEach((el, i) => el.classList.toggle("active", i === index));
-  renderStepDetail(state.currentCompany.steps[index]);
+  showStepDetail(state.currentCompany.steps[index]);
 }
 
-function renderStepDetail(step) {
+function showStepDetail(step) {
+  if (!step) {
+    $("#step-detail").innerHTML = `<div class="empty-state"><p>왼쪽에서 단계를 선택하세요.</p></div>`;
+    return;
+  }
   const personaOptions = state.data.personas
-    .map(p => `<option value="${p.name}" ${p.name === step.persona ? "selected" : ""}>${p.name} — ${p.role}</option>`)
+    .map(p => `<option value="${esc(p.name)}" ${p.name === step.persona ? "selected" : ""}>${esc(p.name)} — ${esc(p.role)}</option>`)
     .join("");
 
   $("#step-detail").innerHTML = `
     <div class="step-form">
       <label>단계 ID
-        <input type="text" id="field-id" value="${step.id}" />
+        <input type="text" id="field-id" value="${esc(step.id)}" />
       </label>
       <label>단계 이름
-        <input type="text" id="field-name" value="${step.name}" />
+        <input type="text" id="field-name" value="${esc(step.name)}" />
       </label>
       <label>페르소나
         <select id="field-persona">
@@ -195,10 +259,10 @@ function renderStepDetail(step) {
         </select>
       </label>
       <label>프롬프트 템플릿 경로
-        <input type="text" id="field-template" value="${step.prompt_template || ""}" placeholder="prompts/01_step.md" />
+        <input type="text" id="field-template" value="${esc(step.prompt_template || "")}" placeholder="prompts/01_step.md" />
       </label>
       <label>출력 경로
-        <input type="text" id="field-output" value="${step.outputs?.[0]?.path || ""}" placeholder="output/01_step/" />
+        <input type="text" id="field-output" value="${esc(step.outputs?.[0]?.path || "")}" placeholder="output/01_step/" />
       </label>
       <div style="display:flex;gap:8px;margin-top:8px;">
         <button class="btn-secondary" id="btn-delete-step" style="color:var(--danger);">단계 삭제</button>
@@ -206,9 +270,9 @@ function renderStepDetail(step) {
     </div>
   `;
 
-  // 실시간 저장
   ["field-id","field-name","field-persona","field-template","field-output"].forEach(id => {
     $(`#${id}`).addEventListener("input", syncStepFromForm);
+    $(`#${id}`).addEventListener("change", syncStepFromForm);
   });
   $("#btn-delete-step").addEventListener("click", deleteCurrentStep);
 }
@@ -222,8 +286,15 @@ function syncStepFromForm() {
   if (!step.outputs) step.outputs = [{}];
   step.outputs[0].path = $("#field-output").value;
   renderStepList();
-  // 현재 선택 유지
   $$(".step-item")[state.currentStep]?.classList.add("active");
+}
+
+function syncCompanyMeta() {
+  state.currentCompany.name = $("#wf-name").value;
+  state.currentCompany.description = $("#wf-description").value;
+  state.currentCompany.icon = $("#wf-icon").value;
+  state.currentCompany.default_mode = $("#wf-mode").value;
+  $("#editor-title").textContent = state.currentCompany.name;
 }
 
 function deleteCurrentStep() {
@@ -231,67 +302,47 @@ function deleteCurrentStep() {
   state.currentCompany.steps.splice(state.currentStep, 1);
   state.currentStep = null;
   renderStepList();
-  $("#step-detail").innerHTML = `<div class="empty-state"><p>왼쪽에서 단계를 선택하세요.</p></div>`;
+  showStepDetail(null);
 }
 
-// ── 저장 ─────────────────────────────────────────────────────
+// ── 저장 / 내보내기 ──────────────────────────────────────────
 function saveCompany() {
+  syncCompanyMeta();
   const idx = state.data.companies.findIndex(c => c.id === state.currentCompany.id);
-  if (idx >= 0) {
-    state.data.companies[idx] = state.currentCompany;
-  } else {
-    state.data.companies.push(state.currentCompany);
-  }
+  if (idx >= 0) state.data.companies[idx] = state.currentCompany;
+  else state.data.companies.push(state.currentCompany);
   Store.save(state.data);
-  alert("저장됐습니다.");
+  // 저장 버튼 피드백
+  const btn = $("#btn-save");
+  btn.textContent = "저장됨 ✓";
+  setTimeout(() => { btn.textContent = "저장"; }, 1500);
 }
 
-// ── 내보내기 (YAML 생성) ──────────────────────────────────────
 function exportCompany() {
-  const c = state.currentCompany;
-  const yaml = generateYAML(c);
-  const blob = new Blob([yaml], { type: "text/yaml" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${c.id}_workflow.yaml`;
-  a.click();
-  URL.revokeObjectURL(url);
+  syncCompanyMeta();
+  download(`${state.currentCompany.id}_workflow.yaml`, generateYAML(state.currentCompany), "text/yaml");
 }
 
 function generateYAML(c) {
-  let out = `name: ${c.name}\n`;
-  out += `description: ${c.description || ""}\n`;
-  out += `version: 1.0\n`;
-  out += `default_mode: ${c.default_mode || "cline"}\n\n`;
-
+  let out = `name: ${c.name}\ndescription: ${c.description || ""}\nversion: 1.0\ndefault_mode: ${c.default_mode || "cline"}\n`;
   if (c.inputs?.length) {
-    out += `inputs:\n`;
+    out += `\ninputs:\n`;
     c.inputs.forEach(inp => {
-      out += `  - name: ${inp.name}\n`;
-      out += `    description: ${inp.description || ""}\n`;
-      out += `    required: ${inp.required !== false}\n`;
+      out += `  - name: ${inp.name}\n    description: ${inp.description || ""}\n    required: ${inp.required !== false}\n`;
       if (inp.default) out += `    default: ${inp.default}\n`;
     });
-    out += "\n";
   }
-
-  out += `steps:\n`;
+  out += `\nsteps:\n`;
   c.steps.forEach(step => {
-    out += `  - id: ${step.id}\n`;
-    out += `    name: ${step.name}\n`;
+    out += `  - id: ${step.id}\n    name: ${step.name}\n`;
     if (step.persona) out += `    persona: ${step.persona}\n`;
     if (step.prompt_template) out += `    prompt_template: ${step.prompt_template}\n`;
-    if (step.outputs?.[0]?.path) {
-      out += `    outputs:\n`;
-      out += `      - path: ${step.outputs[0].path}\n`;
-    }
+    if (step.outputs?.[0]?.path) out += `    outputs:\n      - path: ${step.outputs[0].path}\n`;
   });
-
   return out;
 }
 
-// ── 페르소나 렌더 ────────────────────────────────────────────
+// ── 페르소나 ─────────────────────────────────────────────────
 function renderPersonas() {
   const grid = $("#personas-grid");
   grid.innerHTML = "";
@@ -299,13 +350,27 @@ function renderPersonas() {
     const card = document.createElement("div");
     card.className = "persona-card";
     card.innerHTML = `
-      <h3>${p.name}</h3>
-      <div class="role">${p.role}</div>
-      <div class="preview">${p.preview || ""}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <h3>${esc(p.name)}</h3>
+        <button class="btn-export-persona" data-name="${esc(p.name)}" title="내보내기" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;flex-shrink:0">↓</button>
+      </div>
+      <div class="role">${esc(p.role)}</div>
+      <div class="preview">${esc(p.preview || "")}</div>
     `;
-    card.addEventListener("click", () => openPersonaModal(p));
+    card.querySelector("h3").addEventListener("click", () => openPersonaModal(p));
+    card.querySelector(".role").addEventListener("click", () => openPersonaModal(p));
+    card.querySelector(".preview").addEventListener("click", () => openPersonaModal(p));
+    card.querySelector(".btn-export-persona").addEventListener("click", e => {
+      e.stopPropagation();
+      exportPersona(p);
+    });
     grid.appendChild(card);
   });
+}
+
+function exportPersona(p) {
+  const content = p.content || `---\nname: ${p.name}\nrole: ${p.role}\nversion: 1.0\n---\n\n${p.preview || ""}`;
+  download(`${p.name}.md`, content);
 }
 
 function openPersonaModal(persona = null) {
@@ -313,33 +378,26 @@ function openPersonaModal(persona = null) {
   $("#persona-modal-title").textContent = persona ? "페르소나 편집" : "새 페르소나";
   $("#persona-name").value = persona?.name || "";
   $("#persona-role").value = persona?.role || "";
-  $("#persona-content").value = persona?.content || generatePersonaTemplate(persona?.name || "");
+  $("#persona-content").value = persona?.content || `---\nname: \nrole: \nversion: 1.0\n---\n\n# 역할\n당신은 ...\n\n# 작업 원칙\n- \n\n# 출력 형식\n- `;
   modal.classList.remove("hidden");
   modal._editing = persona;
-}
-
-function generatePersonaTemplate(name) {
-  return `---\nname: ${name}\nrole: \nversion: 1.0\n---\n\n# 역할\n당신은 ...\n\n# 작업 원칙\n- \n\n# 출력 형식\n- `;
 }
 
 function savePersonaModal() {
   const name = $("#persona-name").value.trim();
   const role = $("#persona-role").value.trim();
   const content = $("#persona-content").value;
-
   if (!name) return alert("이름을 입력하세요.");
-
   const preview = content.split("\n").find(l => l.trim() && !l.startsWith("#") && !l.startsWith("---")) || "";
-  const persona = { name, role, content, preview: preview.replace(/^-\s*/, "").slice(0, 80) };
-
+  const persona = { name, role, content, preview: preview.replace(/^[-*]\s*/, "").slice(0, 80) };
   const editing = $("#persona-modal")._editing;
   if (editing) {
     const idx = state.data.personas.findIndex(p => p.name === editing.name);
     if (idx >= 0) state.data.personas[idx] = persona;
+    else state.data.personas.push(persona);
   } else {
     state.data.personas.push(persona);
   }
-
   Store.save(state.data);
   renderPersonas();
   $("#persona-modal").classList.add("hidden");
@@ -348,11 +406,12 @@ function savePersonaModal() {
 // ── 실행 뷰 ──────────────────────────────────────────────────
 function initRunView() {
   const select = $("#run-company");
-  select.innerHTML = state.data.companies.map(c =>
-    `<option value="${c.id}">${c.name}</option>`
-  ).join("");
-  updateRunCommand();
-  select.addEventListener("change", updateRunInputs);
+  // 이벤트 중복 방지
+  const fresh = select.cloneNode(false);
+  select.parentNode.replaceChild(fresh, select);
+
+  fresh.innerHTML = state.data.companies.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("");
+  fresh.addEventListener("change", () => { updateRunInputs(); updateRunCommand(); });
   $("#run-mode").addEventListener("change", updateRunCommand);
   $("#run-generate-scripts").addEventListener("change", updateRunCommand);
   updateRunInputs();
@@ -363,8 +422,7 @@ function updateRunInputs() {
   const company = state.data.companies.find(c => c.id === companyId);
   const container = $("#run-inputs");
   container.innerHTML = "";
-
-  company?.inputs?.forEach(inp => {
+  (company?.inputs || []).forEach(inp => {
     const label = document.createElement("label");
     label.textContent = inp.description + (inp.required ? "" : " (선택)");
     const input = document.createElement("input");
@@ -375,24 +433,23 @@ function updateRunInputs() {
     label.appendChild(input);
     container.appendChild(label);
   });
-
   updateRunCommand();
 }
 
 function updateRunCommand() {
-  const companyId = $("#run-company").value;
+  const companyId = $("#run-company")?.value;
+  if (!companyId) return;
   const mode = $("#run-mode").value;
   const generateScripts = $("#run-generate-scripts").checked;
-
-  const inputEls = $$("#run-inputs input");
-  const inputArgs = inputEls
-    .map(el => el.value.trim() ? `"${el.dataset.key}=${el.value.trim()}"` : null)
-    .filter(Boolean)
+  const inputArgs = $$("#run-inputs input")
+    .filter(el => el.value.trim())
+    .map(el => `"${el.dataset.key}=${el.value.trim()}"`)
     .join(" ");
 
-  let cmd = `python orchestrator/orchestrator.py \\\n  --company ${companyId} \\\n  --mode ${mode}`;
+  let cmd = `cd SingleAgentCompany\npip install -r orchestrator/requirements.txt\n\npython orchestrator/orchestrator.py \\\n  --company ${companyId} \\\n  --mode ${mode}`;
   if (inputArgs) cmd += ` \\\n  --inputs ${inputArgs}`;
   if (generateScripts) cmd += ` \\\n  --generate-scripts`;
+  cmd += `\n\n# 상태 확인\npython orchestrator/orchestrator.py --company ${companyId} --status\n\n# 특정 단계부터 재시작\npython orchestrator/orchestrator.py --company ${companyId} --from-step 02_design`;
 
   $("#run-command-output").textContent = cmd;
 }
@@ -414,39 +471,48 @@ function init() {
     });
   });
 
-  // 편집기 버튼
+  // 편집기
   $("#btn-back").addEventListener("click", () => showView("companies"));
   $("#btn-save").addEventListener("click", saveCompany);
   $("#btn-export").addEventListener("click", exportCompany);
 
+  // 워크플로우 메타 편집 실시간 동기화
+  ["wf-name","wf-description","wf-icon","wf-mode"].forEach(id => {
+    document.addEventListener("input", e => { if (e.target.id === id) syncCompanyMeta(); });
+    document.addEventListener("change", e => { if (e.target.id === id) syncCompanyMeta(); });
+  });
+
+  // 단계 추가
   $("#btn-add-step").addEventListener("click", () => {
-    const newStep = {
-      id: `0${state.currentCompany.steps.length + 1}_new_step`,
-      name: "새 단계",
-      persona: "",
-      prompt_template: "",
-      outputs: [{ path: "" }]
-    };
-    state.currentCompany.steps.push(newStep);
+    const n = state.currentCompany.steps.length + 1;
+    const pad = String(n).padStart(2, "0");
+    state.currentCompany.steps.push({
+      id: `${pad}_new_step`, name: "새 단계", persona: "",
+      prompt_template: `prompts/${pad}_new_step.md`,
+      outputs: [{ path: `output/${pad}_new_step/` }]
+    });
     renderStepList();
     selectStep(state.currentCompany.steps.length - 1);
   });
 
+  // inputs 추가
+  $("#btn-add-input").addEventListener("click", () => {
+    if (!state.currentCompany.inputs) state.currentCompany.inputs = [];
+    state.currentCompany.inputs.push({ name: "", description: "", required: true, default: "" });
+    renderInputsList();
+  });
+
   // 새 워크플로우
   $("#btn-new-company").addEventListener("click", () => {
-    const id = `company-${Date.now()}`;
     state.currentCompany = {
-      id, icon: "⚡",
-      name: "새 워크플로우",
-      description: "",
-      default_mode: "cline",
-      inputs: [],
-      steps: []
+      id: `company-${Date.now()}`, icon: "⚡",
+      name: "새 워크플로우", description: "",
+      default_mode: "cline", inputs: [], steps: []
     };
     state.currentStep = null;
-    $("#editor-title").textContent = state.currentCompany.name;
+    renderEditorHeader();
     renderStepList();
-    $("#step-detail").innerHTML = `<div class="empty-state"><p>+ 버튼으로 단계를 추가하세요.</p></div>`;
+    showStepDetail(null);
     showView("editor");
   });
 
@@ -458,8 +524,7 @@ function init() {
 
   // 실행 명령 복사
   $("#btn-run").addEventListener("click", () => {
-    const text = $("#run-command-output").textContent;
-    navigator.clipboard.writeText(text).then(() => {
+    navigator.clipboard.writeText($("#run-command-output").textContent).then(() => {
       const btn = $("#btn-run");
       btn.textContent = "복사됨 ✓";
       setTimeout(() => { btn.textContent = "실행 명령 복사"; }, 2000);
