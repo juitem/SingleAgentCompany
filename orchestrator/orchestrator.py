@@ -178,12 +178,18 @@ def adapter_claude(step: dict, prompt: str, prompt_file: Path, output_dir: Path)
 
 
 def adapter_cline(step: dict, prompt: str, prompt_file: Path, output_dir: Path) -> bool:
-    """Cline CLI로 자동 실행 + DONE.md 감지."""
+    """Cline CLI로 자동 실행 + DONE.md 감지.
+
+    Cline CLI 파라미터:
+      -y           : yolo 모드 (모든 작업 자동 승인)
+      -c <dir>     : 작업 디렉토리 지정
+      <prompt>     : 실행할 프롬프트 (마지막 인자로 직접 전달)
+    """
     _print_step_header(step, "Cline CLI 실행 중...")
-    cmd = ["cline", "--task", prompt, "--output-dir", str(output_dir)]
+    # 프롬프트를 파일로 저장하고 파일 내용을 읽어서 전달
+    cmd = ["cline", "-y", "-c", str(output_dir), prompt]
     try:
         subprocess.run(cmd, check=True)
-        # DONE.md 감지 (Cline이 완료 표시를 남겼는지 확인)
         done_file = output_dir / "DONE.md"
         if done_file.exists():
             print(f"  ✓ DONE.md 확인: {done_file}")
@@ -191,7 +197,7 @@ def adapter_cline(step: dict, prompt: str, prompt_file: Path, output_dir: Path) 
             print(f"  ⚠ DONE.md 없음. 결과물을 확인하세요: {output_dir}")
         return True
     except FileNotFoundError:
-        print("  오류: Cline CLI 없음. npm install -g cline")
+        print("  오류: Cline CLI 없음.")
         print(f"  수동 실행: {prompt_file}")
         return False
     except subprocess.CalledProcessError as e:
@@ -293,7 +299,7 @@ def generate_scripts(workflow: dict, company_dir: Path, context: dict):
 
         for tool, cmd_tpl in [
             ("claude", f'claude --print --dangerously-skip-permissions "$(cat \'{prompt_file}\')" > "{output_dir}/response.md"'),
-            ("cline",  f'cline --task "$(cat \'{prompt_file}\')" --output-dir "{output_dir}"'),
+            ("cline",  f'cline -y -c "{output_dir}" "$(cat \'{prompt_file}\')"'),
         ]:
             script = scripts_dir / f"{step['id']}_{tool}.sh"
             script.write_text(
