@@ -25,6 +25,25 @@ import yaml
 BASE_DIR = Path(__file__).parent.parent
 PROMPTS_DIR_NAME = "_prompts"
 STATE_FILE_NAME = "_state.json"
+LOG_FILE_NAME = "_run.log"
+
+# ── 로거 ─────────────────────────────────────────────────────
+
+_log_file: Path | None = None
+
+def init_logger(company_dir: Path):
+    global _log_file
+    log_dir = company_dir / "output"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    _log_file = log_dir / LOG_FILE_NAME
+
+def log(msg: str, level: str = "INFO"):
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{ts}] [{level}] {msg}"
+    print(line)
+    if _log_file:
+        with open(_log_file, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
 
 
 # ── 파일 로딩 ────────────────────────────────────────────────
@@ -141,6 +160,7 @@ def _print_step_header(step: dict, extra: str = ""):
 
 def adapter_manual(step: dict, prompt: str, prompt_file: Path, output_dir: Path) -> bool:
     """프롬프트 파일 저장 후 사용자 확인 대기."""
+    log(f"[{step['id']}] 수동 실행 대기")
     _print_step_header(step, "수동 실행 대기")
     print(f"  프롬프트: {prompt_file}")
     print(f"  출력 폴더: {output_dir}")
@@ -151,15 +171,18 @@ def adapter_manual(step: dict, prompt: str, prompt_file: Path, output_dir: Path)
     print("  계속: Enter  |  중단: q  |  건너뜀: s  >> ", end="", flush=True)
     ans = input().strip().lower()
     if ans == "q":
+        log(f"[{step['id']}] 사용자 중단", "WARN")
         return False
     if ans == "s":
-        print("  건너뜁니다.")
+        log(f"[{step['id']}] 건너뜀")
         return True
+    log(f"[{step['id']}] 수동 완료 확인")
     return True
 
 
 def adapter_claude(step: dict, prompt: str, prompt_file: Path, output_dir: Path) -> bool:
     """claude CLI (Claude Code)로 자동 실행."""
+    log(f"[{step['id']}] claude CLI 시작")
     _print_step_header(step, "claude CLI 실행 중...")
     cmd = ["claude", "--print", "--dangerously-skip-permissions", prompt]
     try:
@@ -167,13 +190,14 @@ def adapter_claude(step: dict, prompt: str, prompt_file: Path, output_dir: Path)
         output_dir.mkdir(parents=True, exist_ok=True)
         response_file = output_dir / "response.md"
         response_file.write_text(result.stdout, encoding="utf-8")
-        print(f"  완료: {response_file}")
+        log(f"[{step['id']}] claude CLI 완료 → {response_file}")
         return True
     except FileNotFoundError:
+        log(f"[{step['id']}] claude CLI 없음", "ERROR")
         print("  오류: claude CLI 없음. npm install -g @anthropic-ai/claude-code")
         return False
     except subprocess.CalledProcessError as e:
-        print(f"  오류: {e.stderr}")
+        log(f"[{step['id']}] claude CLI 오류: {e.stderr}", "ERROR")
         return False
 
 
@@ -187,26 +211,29 @@ def adapter_cline(step: dict, prompt: str, prompt_file: Path, output_dir: Path) 
 
     프롬프트가 길 수 있으므로 파일로 저장 후 경로만 전달.
     """
+    log(f"[{step['id']}] Cline CLI 시작")
     _print_step_header(step, "Cline CLI 실행 중...")
     print(f"  프롬프트 파일: {prompt_file}")
 
-    # 프롬프트 파일 경로를 전달 — Cline이 파일을 읽고 실행
     task = f"다음 파일을 읽고 지시사항을 그대로 수행하세요: {prompt_file}"
     cmd = ["cline", "-y", "-c", str(output_dir), task]
     try:
         subprocess.run(cmd, check=True)
         done_file = output_dir / "DONE.md"
         if done_file.exists():
+            log(f"[{step['id']}] Cline 완료 — DONE.md 확인됨")
             print(f"  ✓ DONE.md 확인: {done_file}")
         else:
+            log(f"[{step['id']}] Cline 완료 — DONE.md 없음", "WARN")
             print(f"  ⚠ DONE.md 없음. 결과물을 확인하세요: {output_dir}")
         return True
     except FileNotFoundError:
+        log(f"[{step['id']}] Cline CLI 없음", "ERROR")
         print("  오류: Cline CLI 없음.")
         print(f"  수동 실행: {prompt_file}")
         return False
     except subprocess.CalledProcessError as e:
-        print(f"  오류: {e}")
+        log(f"[{step['id']}] Cline CLI 오류: {e}", "ERROR")
         return False
 
 
@@ -268,22 +295,30 @@ def run_workflow(workflow: dict, company_dir: Path, context: dict,
     for step in workflow["steps"]:
         context["outputs"][step["id"]] = str(company_dir / step["outputs"][0]["path"])
 
+    log(f"워크플로우 시작: {workflow['name']} ({mode} 모드, {len(steps)}단계)")
+    log(f"로그 파일: {company_dir}/output/{LOG_FILE_NAME}")
+    print(f"\n  실시간 로그 확인: tail -f {company_dir}/output/{LOG_FILE_NAME}")
+
     total = len(steps)
     for i, step in enumerate(steps, 1):
         step_id = step["id"]
 
         # 이미 완료된 단계 건너뜀
         if skip_done and is_step_done(company_dir, step_id):
+            log(f"[{step_id}] 건너뜀 (이미 완료)")
             print(f"  [{i}/{total}] {step_id} — 이미 완료 (건너뜀)")
             continue
 
+        log(f"[{step_id}] 시작 ({i}/{total})")
         print(f"\n  진행: {i}/{total}")
         prompt, prompt_file, output_dir = prepare_step(step, context, company_dir)
         success = adapter(step, prompt, prompt_file, output_dir)
 
         if success:
             mark_step_done(company_dir, step_id)
+            log(f"[{step_id}] 완료")
         else:
+            log(f"[{step_id}] 실패 — 워크플로우 중단", "ERROR")
             print(f"\n중단: {step_id}")
             print(f"재시작: python orchestrator.py --company {company_dir.name} --from-step {step_id}")
             sys.exit(0)
@@ -427,6 +462,8 @@ def main():
 
     user_inputs = collect_user_inputs(workflow, args.inputs)
     context = {"user": user_inputs, "outputs": {}}
+
+    init_logger(company_dir)
 
     if args.generate_scripts:
         generate_scripts(workflow, company_dir, context)
