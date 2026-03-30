@@ -217,8 +217,35 @@ def adapter_cline(step: dict, prompt: str, prompt_file: Path, output_dir: Path) 
 
     task = f"다음 파일을 읽고 지시사항을 그대로 수행하세요: {prompt_file}"
     cmd = ["cline", "-y", "-c", str(output_dir), task]
+
+    # Cline 출력을 별도 로그 파일로 저장
+    cline_log = output_dir / "_cline.log"
+    print(f"  Cline 로그: {cline_log}")
+    print(f"  다른 터미널에서 실시간 확인: tail -f \"{cline_log}\"")
+
     try:
-        subprocess.run(cmd, check=True)
+        with open(cline_log, "w", encoding="utf-8") as lf:
+            lf.write(f"[{datetime.now()}] Cline 시작\n")
+            lf.write(f"cmd: {' '.join(cmd)}\n")
+            lf.write("-" * 60 + "\n")
+            lf.flush()
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            for line in proc.stdout:
+                lf.write(line)
+                lf.flush()
+            proc.wait()
+            lf.write(f"\n[{datetime.now()}] 종료 코드: {proc.returncode}\n")
+
+        if proc.returncode != 0:
+            raise subprocess.CalledProcessError(proc.returncode, cmd)
+
         done_file = output_dir / "DONE.md"
         if done_file.exists():
             log(f"[{step['id']}] Cline 완료 — DONE.md 확인됨")
@@ -233,7 +260,8 @@ def adapter_cline(step: dict, prompt: str, prompt_file: Path, output_dir: Path) 
         print(f"  수동 실행: {prompt_file}")
         return False
     except subprocess.CalledProcessError as e:
-        log(f"[{step['id']}] Cline CLI 오류: {e}", "ERROR")
+        log(f"[{step['id']}] Cline CLI 오류 (종료코드: {e.returncode})", "ERROR")
+        print(f"  오류 로그: {cline_log}")
         return False
 
 
