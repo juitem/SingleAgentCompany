@@ -1,0 +1,81 @@
+name: Skill Converter Co.
+description: Multi-agent 전제로 작성된 skill.md를 single-agent용 skill.md로 변환
+version: 1.0
+default_mode: cline
+
+# 주의: 이 워크플로우에서 "agent"는 두 가지 의미로 사용됩니다.
+# - 변환 대상 skill의 "multi-agent" = Claude Code의 sub-agent 조율 스킬
+# - 이 워크플로우를 실행하는 "single agent" = Cline 같은 single-agent 도구
+
+inputs:
+  - name: skill_path
+    description: 변환할 multi-agent skill.md 파일 경로
+    type: path
+    required: true
+  - name: target_tool
+    description: 변환 대상 single-agent 도구 (예: cline, cursor, windsurf)
+    type: text
+    required: false
+    default: cline
+
+steps:
+  - id: 01_parse
+    name: 스킬 구조 분석
+    persona: skill_analyst
+    prompt_template: prompts/01_parse.md
+    inputs:
+      - name: skill_path
+        from: "{{user.skill_path}}"
+    outputs:
+      - path: output/01_parse/
+        expected_files:
+          - skill_analysis.md
+          - DONE.md
+
+  - id: 02_mapping
+    name: 변환 전략 수립
+    persona: workflow_architect
+    prompt_template: prompts/02_mapping.md
+    depends_on: [01_parse]
+    inputs:
+      - name: analysis
+        from: "{{output.01_parse}}"
+      - name: target_tool
+        from: "{{user.target_tool}}"
+    outputs:
+      - path: output/02_mapping/
+        expected_files:
+          - conversion_mapping.md
+          - DONE.md
+
+  - id: 03_rewrite
+    name: Single-agent 스킬 작성
+    persona: skill_writer
+    prompt_template: prompts/03_rewrite.md
+    depends_on: [02_mapping]
+    inputs:
+      - name: mapping
+        from: "{{output.02_mapping}}"
+      - name: original_skill
+        from: "{{user.skill_path}}"
+    outputs:
+      - path: output/03_rewrite/
+        expected_files:
+          - skill_converted.md
+          - DONE.md
+
+  - id: 04_review
+    name: 검수 및 검증
+    persona: skill_reviewer
+    prompt_template: prompts/04_review.md
+    depends_on: [03_rewrite]
+    inputs:
+      - name: original_skill
+        from: "{{user.skill_path}}"
+      - name: converted_skill
+        from: "{{output.03_rewrite}}"
+    outputs:
+      - path: output/04_review/
+        expected_files:
+          - review_report.md
+          - DONE.md

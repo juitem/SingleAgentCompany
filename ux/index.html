@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SingleAgentCompany</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- 사이드바 -->
+    <aside class="sidebar">
+      <div class="logo">
+        <span class="logo-icon">🏢</span>
+        <span class="logo-text">SingleAgentCompany</span>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-view="companies">
+          <span class="nav-icon">⚡</span> 워크플로우
+        </button>
+        <button class="nav-item" data-view="personas">
+          <span class="nav-icon">👤</span> 페르소나
+        </button>
+        <button class="nav-item" data-view="run">
+          <span class="nav-icon">▶</span> 실행
+        </button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <button class="btn-new" id="btn-new-company">+ 새 워크플로우</button>
+      </div>
+    </aside>
+
+    <!-- 메인 -->
+    <main class="main">
+
+      <!-- 워크플로우 목록 뷰 -->
+      <div class="view active" id="view-companies">
+        <div class="view-header">
+          <h1>워크플로우</h1>
+          <p class="subtitle">각 "회사"는 하나의 워크플로우입니다.</p>
+        </div>
+        <div class="companies-grid" id="companies-grid">
+          <!-- JS로 채워짐 -->
+        </div>
+      </div>
+
+      <!-- 워크플로우 편집 뷰 -->
+      <div class="view" id="view-editor">
+        <div class="view-header">
+          <button class="btn-back" id="btn-back">← 목록</button>
+          <h1 id="editor-title">워크플로우 편집</h1>
+          <div class="header-actions">
+            <button class="btn-secondary" id="btn-export">내보내기</button>
+            <button class="btn-primary" id="btn-save">저장</button>
+          </div>
+        </div>
+
+        <div class="editor-layout">
+          <!-- 단계 목록 -->
+          <div class="steps-panel">
+            <div class="panel-header">
+              <span>단계</span>
+              <button class="btn-icon" id="btn-add-step">+</button>
+            </div>
+            <div class="steps-list" id="steps-list">
+              <!-- JS로 채워짐 -->
+            </div>
+          </div>
+
+          <!-- 단계 상세 편집 -->
+          <div class="step-detail" id="step-detail">
+            <div class="empty-state">
+              <p>왼쪽에서 단계를 선택하세요.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 페르소나 라이브러리 뷰 -->
+      <div class="view" id="view-personas">
+        <div class="view-header">
+          <h1>페르소나 라이브러리</h1>
+          <button class="btn-primary" id="btn-new-persona">+ 새 페르소나</button>
+        </div>
+        <div class="personas-grid" id="personas-grid">
+          <!-- JS로 채워짐 -->
+        </div>
+      </div>
+
+      <!-- 페르소나 편집 모달 -->
+      <div class="modal-overlay hidden" id="persona-modal">
+        <div class="modal">
+          <div class="modal-header">
+            <h2 id="persona-modal-title">페르소나 편집</h2>
+            <button class="btn-close" id="persona-modal-close">✕</button>
+          </div>
+          <div class="modal-body">
+            <label>이름 (영문, snake_case)
+              <input type="text" id="persona-name" placeholder="예: frontend_dev" />
+            </label>
+            <label>역할명
+              <input type="text" id="persona-role" placeholder="예: Frontend Developer" />
+            </label>
+            <label>내용 (Markdown)
+              <textarea id="persona-content" rows="16" placeholder="# 역할&#10;당신은 ..."></textarea>
+            </label>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-secondary" id="persona-modal-cancel">취소</button>
+            <button class="btn-primary" id="persona-modal-save">저장</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 실행 뷰 -->
+      <div class="view" id="view-run">
+        <div class="view-header">
+          <h1>실행</h1>
+        </div>
+        <div class="run-panel">
+          <div class="run-config">
+            <label>워크플로우
+              <select id="run-company"></select>
+            </label>
+            <label>실행 모드
+              <select id="run-mode">
+                <option value="cline">Cline CLI (자동)</option>
+                <option value="claude">Claude CLI (자동)</option>
+                <option value="manual">Manual (수동)</option>
+                <option value="print">Print (stdout)</option>
+              </select>
+            </label>
+            <div id="run-inputs">
+              <!-- 선택된 워크플로우의 inputs가 여기에 렌더링 -->
+            </div>
+            <div class="run-options">
+              <label class="checkbox-label">
+                <input type="checkbox" id="run-generate-scripts" />
+                스크립트 파일 생성
+              </label>
+            </div>
+            <button class="btn-primary btn-large" id="btn-run">실행 명령 복사</button>
+          </div>
+
+          <div class="run-output">
+            <div class="panel-header"><span>생성된 명령어</span></div>
+            <pre id="run-command-output" class="code-block">워크플로우를 선택하세요.</pre>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

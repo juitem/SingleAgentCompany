@@ -1,0 +1,77 @@
+name: Tizen AI Refactor Co.
+description: Tizen 패키지를 AI agent가 잘 이해/관리할 수 있도록 리팩토링하고 문서화
+version: 1.0
+default_mode: cline
+
+inputs:
+  - name: package_path
+    description: 리팩토링할 Tizen 패키지 경로
+    type: path
+    required: true
+  - name: refactor_goals
+    description: 리팩토링 목표 (선택사항, 없으면 AI agent 친화성 향상으로 진행)
+    type: text
+    required: false
+
+steps:
+  - id: 01_analysis
+    name: 코드 분석
+    persona: code_analyst
+    prompt_template: prompts/01_analysis.md
+    inputs:
+      - name: package_path
+        from: "{{user.package_path}}"
+    outputs:
+      - path: output/01_analysis/
+        expected_files:
+          - analysis.md
+          - DONE.md
+
+  - id: 02_plan
+    name: 리팩토링 계획 수립
+    persona: architect
+    prompt_template: prompts/02_plan.md
+    depends_on: [01_analysis]
+    inputs:
+      - name: analysis
+        from: "{{output.01_analysis}}"
+      - name: goals
+        from: "{{user.refactor_goals}}"
+    outputs:
+      - path: output/02_plan/
+        expected_files:
+          - refactor_plan.md
+          - DONE.md
+
+  - id: 03_refactor
+    name: 리팩토링 실행
+    persona: tizen_dev
+    prompt_template: prompts/03_refactor.md
+    depends_on: [02_plan]
+    inputs:
+      - name: plan
+        from: "{{output.02_plan}}"
+      - name: package_path
+        from: "{{user.package_path}}"
+    outputs:
+      - path: output/03_refactor/
+        expected_files:
+          - CHANGELOG.md
+          - DONE.md
+
+  - id: 04_docs
+    name: 문서화
+    persona: tech_writer
+    prompt_template: prompts/04_docs.md
+    depends_on: [03_refactor]
+    inputs:
+      - name: refactored_code
+        from: "{{output.03_refactor}}"
+      - name: analysis
+        from: "{{output.01_analysis}}"
+    outputs:
+      - path: output/04_docs/
+        expected_files:
+          - README.md
+          - AI_GUIDE.md
+          - DONE.md

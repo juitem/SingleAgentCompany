@@ -1,0 +1,70 @@
+name: Web Agency
+description: 사용자 브리핑을 받아 웹페이지를 완성하는 워크플로우
+version: 1.0
+default_mode: cline
+
+inputs:
+  - name: user_brief
+    description: 만들고 싶은 웹페이지에 대한 설명
+    type: text
+    required: true
+
+steps:
+  - id: 01_discovery
+    name: 요구사항 분석
+    persona: pm
+    prompt_template: prompts/01_discovery.md
+    inputs:
+      - name: user_brief
+        from: "{{user.user_brief}}"
+    outputs:
+      - path: output/01_discovery/
+        expected_files:
+          - requirements.md
+          - DONE.md
+
+  - id: 02_design
+    name: 화면 설계
+    persona: ux_designer
+    prompt_template: prompts/02_design.md
+    depends_on: [01_discovery]
+    inputs:
+      - name: requirements
+        from: "{{output.01_discovery}}"
+    outputs:
+      - path: output/02_design/
+        expected_files:
+          - design_spec.md
+          - DONE.md
+
+  - id: 03_frontend
+    name: 프론트엔드 구현
+    persona: frontend_dev
+    prompt_template: prompts/03_frontend.md
+    depends_on: [02_design]
+    inputs:
+      - name: design_spec
+        from: "{{output.02_design}}"
+      - name: requirements
+        from: "{{output.01_discovery}}"
+    outputs:
+      - path: output/03_frontend/
+        expected_files:
+          - index.html
+          - DONE.md
+
+  - id: 04_qa
+    name: QA 검수
+    persona: qa_engineer
+    prompt_template: prompts/04_qa.md
+    depends_on: [03_frontend]
+    inputs:
+      - name: source
+        from: "{{output.03_frontend}}"
+      - name: requirements
+        from: "{{output.01_discovery}}"
+    outputs:
+      - path: output/04_qa/
+        expected_files:
+          - qa_report.md
+          - DONE.md
